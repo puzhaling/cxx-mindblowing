@@ -1,0 +1,3 @@
+fullname pattern: Christopher: count = 100
+brandmodel pattern: Tesla: count = 3
+

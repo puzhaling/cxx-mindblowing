@@ -1,0 +1,6 @@
+# no object files
+*.out
+*.exe
+
+# no hidden files
+.*

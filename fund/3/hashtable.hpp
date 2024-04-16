@@ -6,9 +6,12 @@
 #include <utility>
 #include <limits>
 #include <string_view>
+#include <concepts>
+#include <cstddef>
+#include "iterator.hpp"
 
 #define __HASHTABLE_DEBUG_MODE
-
+    
 constexpr float MAX_LOAD_FACTOR{ 0.8f };
 
 class hashtable 
@@ -123,15 +126,35 @@ public:
             ++(*this);
             return temp;
         }
-        
-        bool operator==(const_iterator const& other) const
+        const_iterator operator--() noexcept
+        {
+            --m_ptr;
+            return *this;
+        }
+        const_iterator operator--(int) noexcept
+        {
+            const_iterator temp{ *this };
+            --(*this);
+            return temp;
+        }
+
+        bool operator<(const_iterator const& other) const noexcept
+        {
+            return m_ptr - other.m_ptr < 0; 
+        }
+        bool operator>(const_iterator const& other) const noexcept
+        {
+            return m_ptr - other.m_ptr > 0;
+        }
+        bool operator==(const_iterator const& other) const noexcept
         {
             return m_ptr == other.m_ptr;
         } 
-        bool operator!=(const_iterator const& other) const 
+        bool operator!=(const_iterator const& other) const noexcept
         {
             return !(m_ptr == other.m_ptr); 
         }
+
     private:
         const_pointer m_ptr;
     };
@@ -143,31 +166,50 @@ public:
             m_ptr{ ptr }
         {}
 
-        reference operator*()
+        reference operator*() noexcept
         {
             return *m_ptr;
         }
-        pointer operator->()
+        pointer operator->() noexcept
         {
             return m_ptr;
         }
-        iterator& operator++() 
+        iterator& operator++() noexcept 
         {
             ++m_ptr;
             return *this;
         }
-        iterator operator++(int)
+        iterator operator++(int) noexcept
         {
-            forward_iterator temp{ *this };
+            iterator temp{ *this };
             ++(*this);
             return temp;
         }
+        iterator operator--() noexcept
+        {
+            --m_ptr;
+            return *this;
+        }
+        iterator operator--(int) noexcept
+        {
+            iterator temp{ *this };
+            --(*this);
+            return temp;
+        }
         
-        bool operator==(forward_iterator const& other) const
+        bool operator<(iterator const& other) const noexcept
+        {
+            return m_ptr - other.m_ptr < 0; 
+        }
+        bool operator>(iterator const& other) const noexcept
+        {
+            return m_ptr - other.m_ptr > 0;
+        }
+        bool operator==(iterator const& other) const noexcept
         {
             return m_ptr == other.m_ptr;
         } 
-        bool operator!=(forward_iterator const& other) const 
+        bool operator!=(iterator const& other) const noexcept 
         {
             return !(m_ptr == other.m_ptr); 
         }
@@ -181,10 +223,16 @@ public:
         hashtable(8)
     {}
     hashtable(size_type N) :
-        m_buckets{ new value_type[N]{} }, m_status{ new bool[N]{} }, m_size{}, m_capacity{ N } 
+        m_buckets{ new value_type[N]{} }, 
+        m_status{ new bool[N]{} }, 
+        m_size{}, 
+        m_capacity{ N } 
     {}
     hashtable(std::initializer_list<std::pair<std::string, int>> ls) :
-        m_buckets{ new value_type[ls.size()] }, m_status{ new bool[ls.size()]{} }, m_size{ ls.size() }, m_capacity{ ls.size() } 
+        m_buckets{ new value_type[ls.size()] }, 
+        m_status{ new bool[ls.size()]{} }, 
+        m_size{ ls.size() }, 
+        m_capacity{ ls.size() } 
     {
         for (const_reference p : ls)
         {
@@ -268,6 +316,18 @@ public:
         }
         return { &m_buckets[index], insertion_took_place };
     }    
+    iterator erase(iterator pos)
+    {
+        std::ptrdiff_t dist{ distance(this->begin(), pos) };
+
+        size_type index{};
+        index = dist < 0 ? -dist : dist;
+
+        m_buckets[index] = value_type{};
+        m_status[index] = 0;
+        m_size--;
+        return ++pos;
+    }
 
     // lookup
     mapped_type& operator[](key_type const& key) 
@@ -327,7 +387,7 @@ public:
         pointer new_buckets{ new value_type[new_capacity]{} };
         bool* new_status{ new bool[new_capacity]{} };
 
-        for (std::size_t i{}; i < m_capacity; ++i)
+        for (size_type i{}; i < m_capacity; ++i)
         {
             if (m_buckets[i].first != key_type{})
             {

@@ -15,8 +15,8 @@ constexpr auto FULLNAME_MAX_LENGTH{ 30 };
 constexpr auto CAR_NUMBER_MAXIMUM_DIGITS_COUNT{ 3 };
 constexpr auto INDENT_WIDTH{ 10 };
 
-//#define __DEBUG_MODE
-#define __RELEASE_MODE
+#define __DEBUG_MODE
+//#define __RELEASE_MODE
 
 #ifdef __DEBUG_MODE
     #ifdef __HASHTABLE_DEBUG_MODE
@@ -76,12 +76,20 @@ int main()
     
     printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
     std::cout << a << '\n';
-   
+
+    
+    std::cout << "------------------------------------------------\n\n\n";   
 
     auto iter{ a.find("Nikita") };
     if (iter != a.end())
     {
-        std::cout << "find: {" << iter->first << ", " << iter->second << "}\n";  
+        std::cout << "find: {" << iter->first << ", " << iter->second << "}\n\n";
+        auto deleteIt = a.erase(iter);
+        std::cout << "size: " << a.size() << ' ' << "capacity: " << a.capacity() << '\n';
+        std::cout << a << '\n';
+
+        std::cout << "elem next to deleted: " << deleteIt->first << ' ' << deleteIt->second << '\n';
+        std::cout << "deletion is complete!\n";
     }
     else
     {

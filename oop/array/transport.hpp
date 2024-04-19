@@ -1,5 +1,9 @@
+#ifndef TRANSPOR_HPP
+#define TRANSPORT_HPP
+
 #include <concepts>
 #include <iostream>
+#include <string>
 
 // за итераторы баллы стоят
 // внедрить предметную область в самостоятельно реализованный контейнер контейнер
@@ -9,7 +13,6 @@ class Transport
 public:
     virtual void drive() const = 0;
 
-private:
     int cost;
     int weight;
     int height;
@@ -24,8 +27,8 @@ class Car : public Transport
 {
 public:
     virtual void drive() const = 0;
-private:
-    Wheel   wheels[4];
+
+    Wheel   m_wheels[4];
     CarBody body;
 };
 
@@ -40,8 +43,8 @@ public:
     {
         std::cout << "Oiling the chain\n";
     } 
-private:
-    Wheel wheels[2];
+
+    Wheel m_wheels[2];
 };
 
 class ElectricCar : public Car
@@ -74,9 +77,42 @@ public:
     {
         std::cout << "Refueling the gasoline car\n";
     }
-private:
+
     GasEngine m_engine;
 };
+
+std::ostream& operator<<(std::ostream& out, Transport* transport)
+{
+    out << "car info:\n";
+    out << "---------\n";
+
+    if (Bicycle* b = dynamic_cast<Bicycle*>(transport); b != nullptr) 
+    {
+        out << "wheels count: " << 
+            (sizeof(b->m_wheels) / sizeof(decltype(b->m_wheels[0]))) << '\n';
+        out << "engine type: no engine\n";
+        out << "You are welcome, sir! We've got a cycle lane for you. Just follow the signs.";
+    }
+    else if (GasolineCar* c = dynamic_cast<GasolineCar*>(transport); c != nullptr)
+    {
+        out << "wheels count: " << 
+            (sizeof(c->m_wheels) / sizeof(c->m_wheels[0])) << '\n';
+        out << "engine type: gasoline engine\n";
+        out << "Good day! I think you car is fully charged, you got a long way for nearest charging station.\n";
+    }
+    else if (ElectricCar* c = dynamic_cast<ElectricCar*>(transport); c != nullptr)
+    {
+        out << "wheels count: " <<
+            (sizeof(c->m_wheels) / sizeof(c->m_wheels[0])) << '\n';
+        out << "engine type: electric engine\n";
+        out << "Oooh, I am sorry, but I can not let you pass. But in a 200 metres you can use a carsharing service.\n";
+    }
+    else 
+    {
+        out << "undefined\n";
+    }
+    return out;
+}
 
 template <typename Transport>
 concept HumanEnergyFree = (std::derived_from<Transport, Car> == true); 
@@ -115,14 +151,16 @@ template <typename T>
 concept Eco = HasBattery<T> || HasChain<T>;
 
 
-int main()
-{
-    Bicycle bycicle{};      
-    GasolineCar gasCar{};   
-    ElectricCar electroCar{};
-    
-    printHighwayAllowedDrive(electroCar);
-    printHighwayAllowedDrive(gasCar);
+//int main()
+//{
+//    Bicycle bycicle{};      
+//   GasolineCar gasCar{};   
+//    ElectricCar electroCar{};
+//    
+//    printHighwayAllowedDrive(electroCar);
+//    printHighwayAllowedDrive(gasCar);
+//
+//    printEcoDrive(bycicle);
+//}
 
-    printEcoDrive(bycicle);
-}
+#endif // TRANSPORT_HPP

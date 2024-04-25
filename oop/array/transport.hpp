@@ -98,14 +98,14 @@ std::ostream& operator<<(std::ostream& out, Transport* transport)
         out << "wheels count: " << 
             (sizeof(c->m_wheels) / sizeof(c->m_wheels[0])) << '\n';
         out << "engine type: gasoline engine\n";
-        out << "Good day! I think you car is fully charged, you got a long way for nearest charging station.\n";
+        out << "Oooh, I am sorry, but I can not let you pass. But in a 200 metres you can use a carsharing service.\n";
     }
     else if (ElectricCar* c = dynamic_cast<ElectricCar*>(transport); c != nullptr)
     {
         out << "wheels count: " <<
             (sizeof(c->m_wheels) / sizeof(c->m_wheels[0])) << '\n';
         out << "engine type: electric engine\n";
-        out << "Oooh, I am sorry, but I can not let you pass. But in a 200 metres you can use a carsharing service.\n";
+        out << "Good day! I think you car is fully charged, you got a long way for nearest charging station.\n";
     }
     else 
     {

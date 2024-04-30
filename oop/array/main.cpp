@@ -60,6 +60,9 @@ int main()
 
     std::cout << "\nend - begin: " << ints.end() - ints.begin() << '\n';
     std::cout << "\nbegin - end: " << ints.begin() - ints.end() << '\n';
+    std::cout << "\ncend - cbegin: " << ints.cend() - ints.cbegin() << '\n';
+    std::cout << "\ncbegin - cend: " << ints.cbegin() - ints.cend() << '\n';
+
     array<int, 10> test1{1,2,3,4,5};
     array<int, 21> test2{1,2,3,4,5};
     std::cout << "\nequality test: ";

@@ -1,4 +1,4 @@
-
+    
 #ifndef ARRAY_HPP
 #define ARRAY_HPP
 
@@ -11,12 +11,11 @@
 #include <algorithm>
 #include <limits>
 
-
 template<typename T, std::size_t N=0>
 requires std::default_initializable<T>
 class array {
 public:
-	class random_access_iterator;
+    class random_access_iterator;
     class const_random_access_iterator;
 
 public:
@@ -38,14 +37,8 @@ public:
             m_ptr{ ptr } 
         {}
 
-        const_reference operator*() const
-        {
-            return *m_ptr;
-        }
-        const_pointer operator->() const
-        {
-            return m_ptr;
-        }
+        const_reference operator*() const { return *m_ptr; }
+        const_pointer operator->() const  { return m_ptr; }
         const_iterator& operator++() 
         {
             ++m_ptr;
@@ -252,43 +245,23 @@ public:
     };
 
 public:
-	// constructors and destructors
-    array() : 
-    	m_base{ new T[N]{} }, m_size{ N }
-    {}
-	array(std::initializer_list<T> ls) :
-		m_base{ new T[N]{} }, m_size{ N } 
-	{	
-        size_type lsize{ ls.size() };
-        size_type i{};
-
-        auto it{ ls.begin() };
-        if (lsize >= N)
-        {
-            for (;i < N; std::advance(it, 1), ++i)
-            {
-                m_base[i] = *it;
-            }
-        }
-        else 
-        {
-            for (;i < lsize; std::advance(it, 1), ++i)
-            {
-                m_base[i] = *it;
-            }
-        }
-	}
-	array(array<T, N> const& other) :
-		m_base{ new T[N] }, m_size{ N }
-	{
-		for (size_type i{}; i < N; ++i)
-		{
-			m_base[i] = other[i];
-		}
-	}
-    ~array() 
+    // constructors and destructors
+    array(std::initializer_list<T> ls) :
+        m_base{}
     {
-        delete[] m_base; 
+        size_type lsize{ ls.size() };
+        if (lsize > this->size())
+        {
+            throw std::length_error("too many initializers for ‘std::array’");
+        }
+
+        auto from{ ls.begin() };
+        auto to{ this->begin() };
+
+        while (from != ls.end())
+        {
+            *(to++) = *(from++);
+        }
     }
 
     array& operator=(array<T, N> const& other)
@@ -314,39 +287,41 @@ public:
     // element access
     reference at(size_type pos) 
 	{ 
-        if (pos >= m_size) 
+        if (pos >= N) 
         {
             throw std::out_of_range("pos is out of range");
         }
         return m_base[pos];
 	}
-    reference      back()                  { return m_base[m_size - 1];  }
-	reference      front()                 { return m_base[0];           }
-	reference      operator[](size_type i) { return m_base[i]; } 
-    const_pointer  data()                  { return m_base; 		        }
+    reference      back()                  { return m_base[N - 1]; }
+	reference      front()                 { return m_base[0];     }
+	reference      operator[](size_type i) { return m_base[i];     } 
+    const_pointer  data()                  { return m_base; 	   }
 
     // iterators
-    iterator 	   begin() 	     { return const_iterator{ m_base 		   }; };
-    iterator 	   end()   	     { return const_iterator{ m_base + m_size  }; };
-    const_iterator begin() const { return const_iterator{ m_base 		   }; };
-    const_iterator end()   const { return const_iterator{ m_base + m_size  }; };
+    iterator 	   begin() 	      { return const_iterator{ m_base     }; }
+    iterator 	   end()   	      { return const_iterator{ m_base + N }; }
+    const_iterator begin()  const { return const_iterator{ const_cast<T*>(m_base)     }; }
+    const_iterator end()    const { return const_iterator{ const_cast<T*>(m_base + N) }; }
+    const_iterator cbegin() const { return const_iterator{ const_cast<T*>(m_base)     }; }
+    const_iterator cend()   const { return const_iterator{ const_cast<T*>(m_base + N) }; }    
 
 	// capacity
-	constexpr bool      empty()    const noexcept { return !m_size; }
-	constexpr size_type size()     const noexcept { return m_size;  }
-    constexpr size_type max_size() const noexcept { return std::numeric_limits<std::size_t>::max() / sizeof(value_type); }
+	constexpr bool      empty()    const { return !N; }
+	constexpr size_type size()     const { return N;  }
+    constexpr size_type max_size() const { return N;  } 
 
     // operations
-	void fill(value_type const& val)
+	void fill(const_reference val)
 	{
-		for (size_type i{}; i < m_size; ++i)
+		for (size_type i{}; i < N; ++i)
 		{	
 			m_base[i] = val;
 		}
 	}
-	void swap(array<T, N>const& other)
+	void swap(array<T, N> const& other)
 	{
-		for (size_type i{}; i < m_size; ++i)
+		for (size_type i{}; i < N; ++i)
 		{	
 			value_type temp{ m_base[i] };
 			m_base[i] = other[i];
@@ -359,8 +334,7 @@ public:
 	}
 
 private:
-	pointer    m_base;
-    size_type  m_size;
+	T m_base[N];
 };
 
 template <typename T, std::size_t N>

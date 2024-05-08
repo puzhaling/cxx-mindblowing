@@ -6,14 +6,17 @@
 #include <utility>
 #include <limits>
 #include <string_view>
-#include <concepts>
 #include <cstddef>
+#include <cstring>
 #include "iterator.hpp"
 
-#define __HASHTABLE_DEBUG_MODE
-    
 constexpr float MAX_LOAD_FACTOR{ 0.8f };
-
+constexpr float MIN_LOAD_FACTOR{ 0.2f };
+// min_load_factor 20 - <>
+// k > 1
+// add tests (white box)
+//
+// 
 class hashtable 
 {
 public:
@@ -22,8 +25,8 @@ public:
 
 public:
     using key_type        = std::string;
-    using mapped_type     = int; 
-    using value_type      = std::pair<std::string, int>;
+    using mapped_type     = AutoDocs; 
+    using value_type      = std::pair<key_type, mapped_type>;
     using size_type       = std::size_t; 
     using reference       = value_type&;
     using const_reference = const value_type&; // BUG() : nested type alias is not working  
@@ -87,16 +90,52 @@ private:
         m_status = new_status;
         m_capacity = capacity; 
     }
-    size_type hash(std::string_view key, size_type capacity) const 
+    size_type hash(key_type const& key, size_type capacity) const 
     {
     	size_type result{};
+        size_type fullname_sum{};
+        size_type request_sum{};
 
+        size_type i{};
     	size_type len{ key.length() };
-	    for (size_type i{}; i < len - 1; i = i + 2)
-	    {
-		    result = (result + (key[i] % 10) + (key[i + 1] % 10)) % capacity;
-	    }   
-    	return result;
+        for (i = 0; i < len; ++i) 
+        {
+            if (std::isspace(key[i])) 
+            {
+                continue;
+            }
+            if (std::isdigit(key[i])) 
+            {
+                break;
+            }
+            fullname_sum += key[i];
+        }
+
+        for ( ; i < len; ++i) 
+        {
+            request_sum = request_sum * 10 + (key[i] - '0');
+        }
+        
+        size_type temp{ request_sum + fullname_sum };
+        
+        int last, prelast;
+        while (temp > 0) 
+        {
+            last = temp % 10;
+            prelast = (temp % 100) / 10;
+            result = result + (last + prelast);
+            temp /= 100;
+        }
+        return result % capacity;
+    }
+    size_type _hash(size_type i, key_type const& key, size_type capacity) const 
+    {
+        while (m_buckets[i].first != key_type{} && m_buckets[i].first != key) 
+        {
+            i++;
+            i %= capacity;
+        }
+        return i;
     }
 
 public:
@@ -218,7 +257,7 @@ public:
     };
 
 public:
-    // constructors and destructor
+    // constructors and destructors
     hashtable() :
         hashtable(8)
     {}
@@ -228,15 +267,15 @@ public:
         m_size{}, 
         m_capacity{ N } 
     {}
-    hashtable(std::initializer_list<std::pair<std::string, int>> ls) :
+    hashtable(std::initializer_list<value_type> ls) :
         m_buckets{ new value_type[ls.size()] }, 
         m_status{ new bool[ls.size()]{} }, 
         m_size{ ls.size() }, 
         m_capacity{ ls.size() } 
     {
-        for (const_reference p : ls)
+        for (const_reference value : ls)
         {
-            this->insert(value_type{ p.first, p.second });
+            this->insert(value);
         }
     }
     ~hashtable() 
@@ -264,7 +303,7 @@ public:
     }
 
     //capacity
-    size_type empty() const noexcept
+    bool empty() const noexcept
     {
         return !m_size;
     }
@@ -276,45 +315,57 @@ public:
     {
         return std::numeric_limits<std::size_t>::max() / sizeof(value_type);
     }
-    #ifdef __HASHTABLE_DEBUG_MODE
-        size_type capacity() const noexcept
-        {
-            return m_capacity;
-        }
-    #endif
+    size_type capacity() const noexcept
+    {
+        return m_capacity;
+    }
     
     // modifiers
     std::pair<forward_iterator, bool> insert(value_type const& value) 
-    {
+    {   
+        // value is not updated, ONLY insert
+        if ( 
         if ((static_cast<float>(m_size) / static_cast<float>(m_capacity)) >= MAX_LOAD_FACTOR)
         {
             reallocate();
         }
-
+        bool insertion_took_place{};
         size_type index{ hash(value.first, m_capacity) };
-        bool insertion_took_place{ true };
-
-        while (m_buckets[index].first != key_type{})
+        if (m_buckets[index].first != key_type{}) 
         {
             if (m_buckets[index].first == value.first)
             {
-                insertion_took_place = false;
-                break;
+                m_buckets[index].second = value.second;
+                return { &m_buckets[index], insertion_took_place = false };
             }
-            index = (index + 1) % m_capacity;
+            index = _hash(index, value.first, m_capacity);
         }
-        
-        if (insertion_took_place) 
+        m_buckets[index] = value;
+        m_status[index] = 1;
+        m_size++;
+        return { &m_buckets[index], insertion_took_place = true };
+    }    
+    std::pair<forward_iterator, bool> emplace(value_type && value) 
+    {   
+        if ((static_cast<float>(m_size) / static_cast<float>(m_capacity)) >= MAX_LOAD_FACTOR)
         {
-            m_buckets[index] = value;
-            m_status[index] = 1;
-            m_size++;
+            reallocate();
         }
-        else 
+        bool insertion_took_place{};
+        size_type index{ hash(value.first, m_capacity) };
+        if (m_buckets[index].first != key_type{}) 
         {
-            m_buckets[index].second = value.second;
+            if (m_buckets[index].first == value.first)
+            {
+                m_buckets[index].second = std::move(value.second);
+                return { &m_buckets[index], insertion_took_place = false };
+            }
+            index = _hash(index, value.first, m_capacity);
         }
-        return { &m_buckets[index], insertion_took_place };
+        m_buckets[index] = std::move(value);
+        m_status[index] = 1;
+        m_size++;
+        return { &m_buckets[index], insertion_took_place = true };
     }    
     iterator erase(iterator pos)
     {
@@ -328,57 +379,95 @@ public:
         m_size--;
         return ++pos;
     }
+    void clear() noexcept
+    {
+        delete[] m_buckets;
+        delete[] m_status;
+        *this = hashtable();
+    }
 
     // lookup
     mapped_type& operator[](key_type const& key) 
     {
-        if ((static_cast<double>(m_size) / static_cast<double>(m_capacity)) >= MAX_LOAD_FACTOR)
+        if ((static_cast<float>(m_size) / static_cast<float>(m_capacity)) >= MAX_LOAD_FACTOR)
         {
             reallocate();
         }
 
         size_type index{ hash(key, m_capacity) };
+        if (m_buckets[index].first != key_type{}) {
+            if (m_buckets[index].first == key) 
+            {
+                return m_buckets[index].second;
+            }
+            index = _hash(index, key, m_capacity);
+        }
         
-        while (m_buckets[index].first != key && m_buckets[index].second != mapped_type{})
+        if (m_buckets[index].first == key_type{})
         {
-            index = (index + 1) % m_capacity;
-        } 
-
-        if (m_buckets[index].first == key)
-        {
-            return m_buckets[index].second;
-        }
-        else 
-        {
-            m_buckets[index] = { key, mapped_type{} };
+            m_buckets[index] = value_type{ key, mapped_type{} };
             m_status[index] = 1;
-            return m_buckets[index].second;
+            m_size++;
         }
+        return m_buckets[index].second;
+    }
+    size_type count(key_type const& key) const
+    {
+        size_type count{};
+        auto iter{ this->begin() };
+        while (iter != this->end()) 
+        {
+            if (iter->first == key) 
+            {
+                count++;
+            }
+            iter++;
+        }
+        return count;
     }
     iterator find(key_type const& key)
     {
         size_type index{ hash(key, m_capacity) };
-        size_type stop{ index };
 
-        while (m_buckets[index].first != key && m_buckets[index].first != key_type{})
+        if (m_buckets[index].first == key) 
         {
-            index = (index + 1) % m_capacity;
+            return iterator{ &m_buckets[index] };
         }
 
-        if (m_buckets[index].first != key_type{})
+        index = _hash(index, key, m_capacity);
+        if (m_buckets[index] != value_type{}) 
         {
-            return { &m_buckets[index] };
+            return iterator{ &m_buckets[index] };
         }
-        else 
+        return this->end();
+    }
+    iterator find(mapped_type& value) 
+    {
+        std::string key{ value.getFullName().getName() + ' ' + value.getFullName().getSurname() + ' ' + std::to_string(value.getRequest()) };
+        size_type index{ hash(key, m_capacity) };
+
+        if (m_buckets[index].second == value) 
         {
-            return this->end();
+            return iterator{ &m_buckets[index] };
         }
+
+        index = _hash(index, key, m_capacity);
+        if (m_buckets[index] != value_type{}) 
+        {
+            return iterator{ &m_buckets[index] };
+        }
+        return this->end();
+    }
+    // C++20 vvvv
+    bool contains(key_type& key)
+    {
+        return this->find(key) != this->end();
     }
 
     // hash policy
     void reserve(size_type count)
     {
-        if (count >= this->max_size())
+        if (count > this->max_size())
         {
             throw std::length_error("not enough memory");
         }
@@ -408,7 +497,13 @@ public:
         {
             if (bucket.first != key_type{})
             {
-                out << '{' << bucket.first << ',' << ' ' << bucket.second << '}' << '\n';
+                size_type len{ strlen(bucket.first.c_str()) };
+                out << bucket.first;
+                while (len++ != 30) {
+                    out << ' ';
+                }
+                out << '\t';
+                out << '{' << bucket.second << '}' << '\n';
             }
         }
         return out;

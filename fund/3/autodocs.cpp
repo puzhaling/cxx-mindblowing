@@ -73,17 +73,17 @@ bool FullName::isvalid(std::string_view str)
 	return !str.empty();
 }
 
-bool operator==(FullName& a, FullName& b) 
+bool operator==(FullName const& a, FullName const& b) 
 { 
 	return a.getName() == b.getName() && a.getSurname() == b.getSurname(); 
 }
 
-bool operator!=(FullName& a, FullName& b) 
+bool operator!=(FullName const& a, FullName const& b) 
 { 
 	return !(a == b); 
 }
 
-bool operator<(FullName& a, FullName& b) 
+bool operator<(FullName const& a, FullName const& b) 
 {
     if (a.getSurname() == b.getSurname()) 
     {
@@ -92,7 +92,7 @@ bool operator<(FullName& a, FullName& b)
     return a.getSurname() < b.getSurname();
 }
 
-bool operator>(FullName& a, FullName& b) 
+bool operator>(FullName const& a, FullName const& b) 
 {
     if (a.getSurname() == b.getSurname()) 
     {
@@ -134,17 +134,17 @@ void StateNumber::setLetters(std::string_view letters)
 	m_letters = letters_copy;
 }
 
-bool operator==(StateNumber& a, StateNumber& b) 
+bool operator==(StateNumber const& a, StateNumber const& b) 
 { 
 	return a.getLetters() == b.getLetters() && a.getNumbers() == b.getNumbers(); 
 }
 
-bool operator!=(StateNumber& a, StateNumber& b) 
+bool operator!=(StateNumber const& a, StateNumber const& b) 
 { 
 	return !(a == b); 
 }
 
-bool operator<(StateNumber& a, StateNumber& b) 
+bool operator<(StateNumber const& a, StateNumber const& b) 
 {
     if (a.getLetters() == b.getLetters()) 
     {
@@ -153,7 +153,7 @@ bool operator<(StateNumber& a, StateNumber& b)
     return a.getLetters() < b.getLetters();
 }
 
-bool operator>(StateNumber& a, StateNumber& b) 
+bool operator>(StateNumber const& a, StateNumber const& b) 
 {
     if (a.getLetters() == b.getLetters()) 
     {
@@ -187,6 +187,29 @@ CarSpecs::CarSpecs(CarSpecs const& copy) :
 	m_model{ copy.m_model }, m_brand{ copy.m_brand }
 {}
 
+bool operator==(CarSpecs const& a, CarSpecs const& b) 
+{
+    return (a.getBrand() == b.getBrand()) && 
+           (a.getModel() == b.getModel());
+}
+
+bool operator!=(CarSpecs const& a, CarSpecs const& b)
+{
+    return !(a == b);
+}
+
+bool operator<(CarSpecs const& a, CarSpecs const& b)
+{
+    if (a.getModel() < b.getModel())
+        return true;
+    return a.getBrand() < b.getBrand();
+}
+
+bool operator>(CarSpecs const& a, CarSpecs const& b)
+{
+    return !(a == b) && !(a < b);
+}
+
 
 // AUTO DOCS CLASS:
 
@@ -218,7 +241,7 @@ bool AutoDocs::contains(std::size_t request) const
 	first we found how many digits there are in a state number. cause it's maximum size - 3,
 	we print additional spaces, as if there is always 3 digit 'm_numbers' 
 */
-std::ostream& operator<<(std::ostream& out, AutoDocs& autoDocs) 
+std::ostream& operator<<(std::ostream& out, AutoDocs const& autoDocs) 
 {
 	std::size_t fullNameLength{ autoDocs.m_fullName.getName().length() + autoDocs.m_fullName.getSurname().length() }; 
 	std::size_t spacesCount{ static_cast<std::size_t>(::INDENT_WIDTH - fullNameLength) };
@@ -257,22 +280,36 @@ std::ostream& operator<<(std::ostream& out, AutoDocs& autoDocs)
 	return out << "request: " << autoDocs.getRequest();
 }
 
-bool operator==(AutoDocs& a, AutoDocs& b) 
+bool operator==(AutoDocs const& a, AutoDocs const& b) 
 { 
-	return a.getRequest() == b.getRequest();
+    return 
+        (a.getFullName() == b.getFullName()) &&
+        (a.getStateNumber() == b.getStateNumber()) &&
+        (a.getCarSpecs() == b.getCarSpecs()) &&
+        (a.getRequest() == b.getRequest()) &&
+        (a.getID() == b.getID());    
 }
 
-bool operator!=(AutoDocs& a, AutoDocs& b) 
+bool operator!=(AutoDocs const& a, AutoDocs const& b) 
 { 
 	return !(a == b); 
 }
 
-bool operator<(AutoDocs& a, AutoDocs& b) 
+bool operator<(AutoDocs const& a, AutoDocs const& b) 
 {
-	return a.getRequest() < b.getRequest();
+	if (a.getFullName() < b.getFullName())
+        return true;
+    if (a.getStateNumber() < b.getStateNumber())
+        return true;
+    if (a.getCarSpecs() < b.getCarSpecs())
+        return true;
+    if (a.getRequest() < b.getRequest())
+        return true;
+    return a.getID() < b.getID();
 }
 
-bool operator>(AutoDocs& a, AutoDocs& b) 
+bool operator>(AutoDocs const& a, AutoDocs const& b) 
 {
-	return a.getRequest() > b.getRequest();
+	return !(a == b) && !(a < b);
 }
+

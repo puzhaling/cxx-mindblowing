@@ -4,6 +4,7 @@
 #include <cassert>
 #include <string>
 #include <filesystem>
+#include <memory>
 #include <stdio.h>
 
 #include "autodocs.hpp"
@@ -15,97 +16,15 @@ constexpr auto FULLNAME_MAX_LENGTH{ 30 };
 constexpr auto CAR_NUMBER_MAXIMUM_DIGITS_COUNT{ 3 };
 constexpr auto INDENT_WIDTH{ 10 };
 
-#define __DEBUG_MODE
-//#define __RELEASE_MODE
+// number of lines to read
+int n{ 6000 };
 
-#ifdef __DEBUG_MODE
-    #ifdef __HASHTABLE_DEBUG_MODE
-int main() 
-{
-    hashtable a{ 2 };
-    
-    printf("is empty? %s\n", a.empty() ? "true" : "false");
-    a.insert({"Sasha", 1});
-    printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
-    std::cout << a << '\n'; 
-
-    std::cout << "----------------------------------\n";
-    auto it = a.insert({"Masha", 2});
-    std::cout << (it.second ? "true" : "false") << '\n';
-    printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
-    std::cout << a << '\n'; 
-    std::cout << "----------------------------------\n";
-   
-    it = a.insert({"Masha", 9999});
-    std::cout << (it.second ? "true" : "false") << '\n';
-    printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
-    std::cout << a << '\n'; 
-    std::cout << "----------------------------------\n";
-
-    a.insert({"Grisha", 3});
-    printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
-    std::cout << a << '\n'; 
-
-    a.insert({"Danila", 4});
-    printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
-    std::cout << a << '\n'; 
-
-    a.insert({"Katya", 5});
-    printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
-    std::cout << a << '\n'; 
-
-    a.insert({"Nikita", 6});
-    printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
-    std::cout << a << '\n'; 
-
-    a["Oleg"] = 7;
-    printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
-    std::cout << a << '\n'; 
-
-    a.insert({"Egor", 8});
-    printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
-    std::cout << a << '\n'; 
-    
-    a.insert({"Mark", 9});
-    printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
-    std::cout << a << '\n'; 
-
-    a.insert({"Ian", 10});
-    printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
-    std::cout << a << '\n'; 
-    
-    printf("size: %lu  capacity: %lu\n", a.size(), a.capacity());
-    std::cout << a << '\n';
-
-    
-    std::cout << "------------------------------------------------\n\n\n";   
-
-    auto iter{ a.find("Nikita") };
-    if (iter != a.end())
-    {
-        std::cout << "find: {" << iter->first << ", " << iter->second << "}\n\n";
-        auto deleteIt = a.erase(iter);
-        std::cout << "size: " << a.size() << ' ' << "capacity: " << a.capacity() << '\n';
-        std::cout << a << '\n';
-
-        std::cout << "elem next to deleted: " << deleteIt->first << ' ' << deleteIt->second << '\n';
-        std::cout << "deletion is complete!\n";
-    }
-    else
-    {
-        std::cout << "not found, end() iterator is returned\n";
-    }
-}
-    #endif
-#endif
-
-#ifdef __RELEASE_MODE
 static void readFromTo
 (std::ifstream& inputStream, hashtable& table) 
 {
 	std::string line{};
 
-	while (!inputStream.eof()) 
+	while (!inputStream.eof() && n--) 
 	{
 		std::getline(inputStream, line, '\n');
 		std::istringstream lineBuffer{ line };
@@ -165,67 +84,62 @@ static void readFromTo
 		{
 			if (name.length() + surname.length() <= FULLNAME_MAX_LENGTH) 
 			{
-                std::string key{ name + " " + surname };
+                AutoDocs doc{ std::move(AutoDocs{FullName{ name, surname }, StateNumber{ stateNumber }, CarSpecs{ brandModel }, request}) };
+                std::string key{ std::move(name + " " + surname + " " + std::to_string(request)) };
                 auto iter{ table.find(key) };
-
                 if (iter == table.end())
-                {
-                    table.insert({ key, request });
+                {   
+                    table.emplace(std::move(std::pair<std::string, AutoDocs>{key, std::move(doc)}));
                 } 
 	        }
 		}
-	}
+    } 
 }
 
-// command style : filepath, key, hashmap capacity.
+// command style : filepath, key.
 int main(int argc, char* argv[]) 
 {	
 	fs::path path{ argv[1] };
 	std::string key{ argv[2] };
-    std::size_t capacity{};
 
-    try
-    {
-        capacity = static_cast<std::size_t>(std::stoull(argv[3]));
-    }
-    catch (std::invalid_argument const& err)
-    {
-        std::cerr << "INVALID SIZE VALUE: " << err.what() << '\n';
-    }
-	
 	if (!fs::exists(path))
     {
         std::cout << "NO SUCH FILE OF FILE CANNOT BE OPENED" << '\n';
         return -1;
 	}
 
-    hashtable table{};
+    hashtable table;
 
-	try
-	{
-		table.reserve(capacity);
-	}
-	catch (std::length_error const& error)
-	{
-		std::cerr << "MEMORY RESERVATION FAILED: "<< error.what() << '\n';
-		return -1;
-	}
 	std::ifstream inputStream{ path.c_str() };
 	assert(inputStream.is_open() && "INPUTSTREAM ASSOCIATED FILE IS NOT FOUND OR CANNOT BE OPENED");
-
+    
 	// read "N" lines from filestream and fill docsContainer with their content
 	readFromTo(inputStream, table);
-	
+
 	std::ofstream outputStream{ "out.txt" };
 	assert(outputStream.is_open() && "OUTPUTSTREAM ASSOCIATED FILE IS NOT FOUND OR CANNOT BE OPENED"); 
 	
 	std::cout << "\n\n\nsize: " << table.size() << '\n';
-    std::cout << "capacity: " << table.capacity() << "\n\n";
+    std::cout << "capacity: " << table.capacity() << '\n' << '\n';
     std::cout << table << '\n';
     
+    // Joseph Davis T204PL ChevroletImpala 7852246  
+    auto iter{ table.find(key) };
+    if (iter != table.end()) 
+    {
+        std::cout << "erasion took place\n";
+        table.erase(iter);
+    }
+    else 
+    {
+        std::cout << "no such a key\n";
+    }
+	std::cout << "size: " << table.size() << '\n';
+    std::cout << "capacity: " << table.capacity() << '\n' << '\n';
+
+    outputStream << table;
 	inputStream.close();
 	outputStream.close();
 	
 	return 0;
 }
-#endif // __RELEASE_MODE

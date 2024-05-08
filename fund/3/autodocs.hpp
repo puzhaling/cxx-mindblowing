@@ -1,4 +1,3 @@
-
 #ifndef AUTO_DOCS_H
 #define AUTO_DOCS_H
 
@@ -15,13 +14,13 @@ std::uint32_t countWords(std::string_view s);
 class FullName 
 {
 public:
-	FullName() = delete;
+	FullName() = default;
 	FullName(FullName const& copy);
 
 	// class invariant : nor m_name and m_surname must be empty and contain numbers
 	FullName(std::string_view name, std::string_view surname);
 
-	friend std::ostream& operator<<(std::ostream& out, FullName& fullName) { return out << fullName.m_name << ' ' << fullName.m_surname; }
+	friend std::ostream& operator<<(std::ostream& out, FullName const& fullName) { return out << fullName.m_name << ' ' << fullName.m_surname; }
 
 	static bool isvalid(std::string_view str);
 
@@ -36,23 +35,23 @@ private:
 	std::string m_surname;
 };
 
-bool operator==(FullName& a, FullName& b);
-bool operator!=(FullName& a, FullName& b);
-bool operator< (FullName& a, FullName& b);
-bool operator> (FullName& a, FullName& b);
+bool operator==(FullName const& a, FullName const& b);
+bool operator!=(FullName const& a, FullName const& b);
+bool operator< (FullName const& a, FullName const& b);
+bool operator> (FullName const& a, FullName const& b);
 
 
 
 class StateNumber 
 {
 public:
-	StateNumber() = delete;
+	StateNumber() = default;
 	StateNumber(StateNumber const& copy);
 
 	// class invariant : string length == 6 && matches the number template
 	StateNumber(std::string_view stateNumber);
 
-	friend std::ostream& operator<<(std::ostream& out, StateNumber& stateNumber) { return out << stateNumber.m_letters << ' ' << stateNumber.m_numbers; }
+	friend std::ostream& operator<<(std::ostream& out, StateNumber const& stateNumber) { return out << stateNumber.m_letters << ' ' << stateNumber.m_numbers; }
 
 	static bool isvalid(std::string_view s) { return s.length() == 6 && isalpha(s[0]) && isdigit(s[1]) && isdigit(s[2]) && isdigit(s[3]) && isalpha(s[4]) && isalpha(s[5]); }
 
@@ -68,17 +67,17 @@ private:
 	std::uint16_t m_numbers;
 };
 
-bool operator==(StateNumber& a, StateNumber& b);
-bool operator!=(StateNumber& a, StateNumber& b);
-bool operator< (StateNumber& a, StateNumber& b);
-bool operator> (StateNumber& a, StateNumber& b);
+bool operator==(StateNumber const& a, StateNumber const& b);
+bool operator!=(StateNumber const& a, StateNumber const& b);
+bool operator< (StateNumber const& a, StateNumber const& b);
+bool operator> (StateNumber const& a, StateNumber const& b);
 
 
 
 class CarSpecs 
 {
 public:
-	CarSpecs() = delete;
+	CarSpecs() = default;
 	CarSpecs(CarSpecs const& copy);
 
 	// input file consist the following input: BrandModel
@@ -88,7 +87,7 @@ public:
 	//			                    	    m_brand m_model
 	CarSpecs(std::string_view s);
 
-	friend std::ostream& operator<<(std::ostream& out, CarSpecs& carSpecs) { return out << carSpecs.m_brand << carSpecs.m_model; }
+	friend std::ostream& operator<<(std::ostream& out, CarSpecs const& carSpecs) { return out << carSpecs.m_brand << carSpecs.m_model; }
 
 	static bool isvalid(std::string_view s) { return std::count_if(std::begin(s), std::end(s), [](char ch) -> bool { return std::isupper(ch); }) == 2; };
 
@@ -113,15 +112,15 @@ private:
 public:
 	static std::uint32_t generateID() { return s_id++; }
 
-	AutoDocs() = delete;
+	AutoDocs() = default;
 	AutoDocs(AutoDocs const& copy);
 	AutoDocs(FullName const& fullName, StateNumber const& stateNumber, CarSpecs const& carSpecs, std::size_t request);
 
-	friend std::ostream& operator<<(std::ostream& out, AutoDocs& autoDocs);
+	friend std::ostream& operator<<(std::ostream& out, AutoDocs const& autoDocs);
 
-	FullName&      getFullName()    { return m_fullName;    }
-	StateNumber&   getStateNumber() { return m_stateNumber; }
-	CarSpecs&      getCarSpecs()    { return m_carSpecs;    }
+	FullName const&      getFullName()    const { return m_fullName;    }
+	StateNumber const&   getStateNumber() const { return m_stateNumber; }
+	CarSpecs const&      getCarSpecs()    const { return m_carSpecs;    }
 	
 	std::size_t    getRequest() const { return m_request; }
 	std::uint32_t  getID()      const { return m_id; } 
@@ -138,11 +137,11 @@ private:
 	std::size_t   m_request;
 };
 
-std::ostream& operator<<(std::ostream& out, AutoDocs& autoDocs);
+std::ostream& operator<<(std::ostream& out, AutoDocs const& autoDocs);
 
-bool operator==(AutoDocs& a, AutoDocs& b);
-bool operator!=(AutoDocs& a, AutoDocs& b);
-bool operator< (AutoDocs& a, AutoDocs& b);
-bool operator> (AutoDocs& a, AutoDocs& b);
+bool operator==(AutoDocs const& a, AutoDocs const& b);
+bool operator!=(AutoDocs const& a, AutoDocs const& b);
+bool operator< (AutoDocs const& a, AutoDocs const& b);
+bool operator> (AutoDocs const& a, AutoDocs const& b);
 
 #endif // AUTO_DOCS_H

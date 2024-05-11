@@ -12,11 +12,7 @@
 
 constexpr float MAX_LOAD_FACTOR{ 0.8f };
 constexpr float MIN_LOAD_FACTOR{ 0.2f };
-// min_load_factor 20 - <>
-// k > 1
-// add tests (white box)
-//
-// 
+
 class hashtable 
 {
 public:
@@ -29,9 +25,9 @@ public:
     using value_type      = std::pair<key_type, mapped_type>;
     using size_type       = std::size_t; 
     using reference       = value_type&;
-    using const_reference = const value_type&; // BUG() : nested type alias is not working  
+    using const_reference = const value_type&; 
     using pointer         = value_type*;
-    using const_pointer   = const value_type*; // same 
+    using const_pointer   = const value_type*;
     using iterator        = forward_iterator;
     using const_iterator  = const_forward_iterator;
 
@@ -323,8 +319,6 @@ public:
     // modifiers
     std::pair<forward_iterator, bool> insert(value_type const& value) 
     {   
-        // value is not updated, ONLY insert
-        if ( 
         if ((static_cast<float>(m_size) / static_cast<float>(m_capacity)) >= MAX_LOAD_FACTOR)
         {
             reallocate();

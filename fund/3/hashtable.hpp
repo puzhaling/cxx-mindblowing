@@ -73,13 +73,35 @@ public:
         m_lines[index] = line;
         m_size++;
     }
+    
+    size_type previous_index(size_type index) {
+        switch (index) {
+        case 0: return this->capacity() - 2; break;
+        case 1: return this->capacity() - 1; break;
+        default: return index - 2; break;
+        }
+    } 
 
     void erase(const std::string& key, const AutoDocs& value) {
         size_type index = find(key).first;
         if (index != -1 && m_buckets[index].second == value) {
             m_buckets[index].first = "";
             m_status[index] = false;
+            m_lines[index] = 0;
+            m_primary_hash_values[index] = 0;
             m_size--;
+
+             
+            int target_hash = primary_hash(key, m_capacity);
+            index = (index + 2) % m_capacity;
+            while (primary_hash(m_buckets[index].first, m_capacity) == target_hash) {
+                std::swap(m_buckets[previous_index(index)], m_buckets[index]);
+                std::swap(m_lines[previous_index(index)], m_lines[index]);
+                std::swap(m_status[previous_index(index)], m_status[index]);
+                std::swap(m_primary_hash_values[previous_index(index)], m_primary_hash_values[index]);
+                index = (index + 2) % m_capacity;
+            } 
+
 
             if (load_factor() <= m_threshold_lower)
                 shrink();

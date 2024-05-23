@@ -1,24 +1,51 @@
-#include "file_system.hpp"
 #include <iostream>
+#include <vector>
+#include <exception>
+#include <memory>
+#include "file_system.hpp"
 
-std::string_view icomponent::get_name() const {
-  return m_name;
+icomponent::icomponent(std::string&& name) {
+  std::string path = "/" + name + "/";
+  m_path = std::move(path);
+  m_name = std::move(name);
+} 
+
+icomponent::icomponent(const std::string& name) :
+  m_name{name}
+{
+  std::string path = "/" + name + "/";
+  m_path = std::move(path);
 }
 
-std::string_view icomponent::get_type() const {
-  return m_type;
+void icomponent::set_name(const std::string& name) {
+  m_name = name;
 }
 
-void directory::info() const {
-  std::cout << "type: " << this->get_type() << '\n';
-  std::cout << "name: " << this->get_name() << '\n';
+void icomponent::set_path(const std::string& path) {
+  m_path = path;
 }
 
-void directory::add(std::unique_ptr<icomponent*>& component) {
-  m_components.push_back(std::move(component));
+directory::directory(std::string&& name) :
+  icomponent(std::move(name))
+{} 
+
+directory::directory(const std::string& name) :
+  icomponent(name)
+{}
+
+void directory::get_info() const {
+
 }
 
-void file::info() const {
-  std::cout << "type: " << this->get_type() << '\n';
-  std::cout << "name: " << this->get_name() << '\n';
+file::file(std::string&& name) :
+  icomponent(std::move(name))
+{}
+
+file::file(const std::string& name) :
+  icomponent(name)
+{}
+
+void file::get_info() const {
+
 }
+

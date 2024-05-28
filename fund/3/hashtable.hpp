@@ -16,34 +16,34 @@ public:
 
 public:
     HashTable() : 
-        m_capacity(8), 
-        m_size(0),
-        m_threshold_upper(0.8f), 
-        m_threshold_lower(0.2f) 
+        capacity_(8), 
+        size_(0),
+        threshold_upper_(0.8f), 
+        threshold_lower_(0.2f) 
     {
-        m_buckets = new std::pair<std::string, AutoDocs>[m_capacity]();
-        m_status = new bool[m_capacity]();
-        m_lines = new int[m_capacity]();
-        m_primary_hash_values = new int[m_capacity]();
+        buckets_ = new std::pair<std::string, AutoDocs>[capacity_]();
+        status_ = new bool[capacity_]();
+        lines_ = new int[capacity_]();
+        phashes_ = new int[capacity_]();
     }
 
     HashTable(size_type N) : 
-        m_capacity(N), 
-        m_size(0), 
-        m_threshold_upper(0.8f), 
-        m_threshold_lower(0.2f) 
+        capacity_(N), 
+        size_(0), 
+        threshold_upper_(0.8f), 
+        threshold_lower_(0.2f) 
     {
-        m_buckets = new std::pair<std::string, AutoDocs>[m_capacity]();
-        m_status = new bool[m_capacity]();
-        m_lines = new int[m_capacity]();
-        m_primary_hash_values = new int[m_capacity]();
+        buckets_ = new std::pair<std::string, AutoDocs>[capacity_]();
+        status_ = new bool[capacity_]();
+        lines_ = new int[capacity_]();
+        phashes_ = new int[capacity_]();
     }
 
     ~HashTable() {
-        delete[] m_buckets;
-        delete[] m_status;
-        delete[] m_lines;
-        delete[] m_primary_hash_values;
+        delete[] buckets_;
+        delete[] status_;
+        delete[] lines_;
+        delete[] phashes_;
     }
 
     void insert(const std::string& key, const AutoDocs& value, int line) {
@@ -51,77 +51,110 @@ public:
             std::cout << "duplicate key. insertion is cancelled\n";
             return;
         }
-        if (load_factor() >= m_threshold_upper)
+        if (load_factor() >= threshold_upper_)
             expand();
 
-        size_type index = primary_hash(key, m_capacity);
+        size_type index = primary_hash(key, capacity_);
         size_type temp = index;
          
-        if (m_status[index]) {
-            index = secondary_hash(m_buckets, index, m_capacity);
+        if (status_[index]) {
+            index = secondary_hash(buckets_, index, capacity_);
             if (index == -1) {
-                expand(m_capacity * 1.5);
+                expand(capacity_ * 1.5);
                 insert(key, value, line);
                 return;
             }
         }
 
-        m_buckets[index] = std::make_pair(key, value);
-        m_status[index] = true;
+        buckets_[index] = std::make_pair(key, value);
+        status_[index] = true;
+
         // primary hash value must be connected to final insertion position of a new key
-        m_primary_hash_values[index] = temp;
-        m_lines[index] = line;
-        m_size++;
+        phashes_[index] = temp;
+        lines_[index] = line;
+        size_++;
     }
     
     size_type previous_index(size_type index) {
         switch (index) {
-        case 0: return this->capacity() - 2; break;
-        case 1: return this->capacity() - 1; break;
+        case 0: return capacity_ - 2; break;
+        case 1: return capacity_ - 1; break;
         default: return index - 2; break;
         }
     } 
 
     void erase(const std::string& key, const AutoDocs& value) {
+        using std::swap;
+
         size_type index = find(key).first;
-        if (index != -1 && m_buckets[index].second == value) {
-            m_buckets[index].first = "";
-            m_status[index] = false;
-            m_lines[index] = 0;
-            m_primary_hash_values[index] = 0;
-            m_size--;
+        if (index == -1)
+            return;
+        if (buckets_[index].second != value) 
+            return;
 
-             
-            int target_hash = primary_hash(key, m_capacity);
-            index = (index + 2) % m_capacity;
-            while (primary_hash(m_buckets[index].first, m_capacity) == target_hash) {
-                std::swap(m_buckets[previous_index(index)], m_buckets[index]);
-                std::swap(m_lines[previous_index(index)], m_lines[index]);
-                std::swap(m_status[previous_index(index)], m_status[index]);
-                std::swap(m_primary_hash_values[previous_index(index)], m_primary_hash_values[index]);
-                index = (index + 2) % m_capacity;
-            } 
+        buckets_[index].first = "";
+        status_[index] = false;
+        lines_[index] = 0;
+        phashes_[index] = -1;
+        size_--;
 
-
-            if (load_factor() <= m_threshold_lower)
+        size_type target_hash = primary_hash(key, capacity_);
+        
+        size_type prev_prev_hash = primary_hash(buckets_[previous_index(index)].first, capacity_);
+        size_type next_next_hash = primary_hash(buckets_[previous_index(index)].first, capacity_);
+        if (prev_prev_hash == next_next_hash) {
+            if (load_factor() <= threshold_lower_)
                 shrink();
+            else 
+                rehash(capacity_);
+            return;
         }
+
+        index = (index + 2) % capacity_;
+        while (status_[index] && primary_hash(buckets_[index].first, capacity_) == target_hash) {
+            swap(buckets_[previous_index(index)], buckets_[index]);
+            swap(lines_[previous_index(index)], lines_[index]);
+            swap(status_[previous_index(index)], status_[index]);
+            swap(phashes_[previous_index(index)], phashes_[index]);
+            index = (index + 2) % capacity_;
+        } 
+
+        // since 'index' stops on non empty bucket, 
+        // we need to get previous_index(index) value to get the right pos
+        size_type empty_index = previous_index(index);
+        size_type current_index = empty_index;
+        target_hash = empty_index;
+
+        for (size_type i = 0; i < capacity_; ++i) {
+            if (status_[i] && phashes_[i] == target_hash && i != current_index) {
+                while (status_[current_index])
+                    current_index = (current_index + 2) % capacity_;
+                
+                swap(buckets_[i], buckets_[current_index]);
+                swap(lines_[i], lines_[current_index]);
+                swap(status_[i], status_[current_index]);
+                swap(phashes_[i], phashes_[current_index]);
+            }            
+        }
+
+        if (load_factor() <= threshold_lower_)
+            shrink();
     }
     
     //        index,     steps to find 
     std::pair<size_type, unsigned> find(const std::string& key) const {
-        size_type index = primary_hash(key, m_capacity);
-        int start = index;
-        if (m_buckets[index].first == "")
+        size_type index = primary_hash(key, capacity_);
+        if (buckets_[index].first == "")
             return std::make_pair(-1, 1);
-        else if (m_buckets[index].first == key)
+        else if (buckets_[index].first == key)
             return std::make_pair(index, 1);
       
-        index = secondary_hash(m_buckets, index, m_capacity, key);
+        int start = index;
+        index = secondary_hash(buckets_, index, capacity_, key);
         int finish = index;
 
         if (index == -1)
-            return std::make_pair(-1, m_capacity);
+            return std::make_pair(-1, capacity_);
         else
             return std::make_pair(index, steps(start, finish));
     }
@@ -131,43 +164,43 @@ public:
     }
 
     size_type size() const {
-        return m_size;
+        return size_;
     }
 
     size_type capacity() const {
-        return m_capacity;
+        return capacity_;
     }
     
     int operator[] (size_type index) const {
-        return m_lines[index];
+        return lines_[index];
     }
 
     friend std::ostream& operator<<(std::ostream& out, HashTable const& table) {
-        for (size_type i = 0; i < table.m_capacity; ++i) {
-            if (table.m_status[i]) {
-                size_type len = table.m_buckets[i].first.length();
-                out << table.m_buckets[i].first;
+        for (size_type i = 0; i < table.capacity_; ++i) {
+            if (table.status_[i]) {
+                size_type len = table.buckets_[i].first.length();
+                out << table.buckets_[i].first;
 
                 while (len++ != 30) 
                     out << ' ';
 
                 out << '\t';
-                out << '{' << table.m_buckets[i].second << '}' << '\t';
-                out << "\thash value: {" << table.m_primary_hash_values[i] << "}";
+                out << '{' << table.buckets_[i].second << '}' << '\t';
+                out << "\thash value: {" << table.phashes_[i] << "}";
                 out << " index: " << i << '\n';
-               // out << "line number: " << table.m_lines[i] << '\n';
+               // out << "line number: " << table.lines_[i] << '\n';
             }
         }
        //out << '[';
-       //for (size_type i = 0; i < table.m_capacity; ++i)
-       //     out << (table.m_status[i] ? 1 : 0);
+       //for (size_type i = 0; i < table.capacity_; ++i)
+       //     out << (table.status_[i] ? 1 : 0);
        //out << ']' << '\n';
        return out;
     } 
 
 private:
     float load_factor() const {
-        return static_cast<float>(m_size) / m_capacity;
+        return static_cast<float>(size_) / capacity_;
     }
 
     size_type primary_hash(const std::string& key, size_type capacity) const {
@@ -195,11 +228,12 @@ private:
             last = temp % 10;
             prelast = (temp % 100) / 10;
             result = result + (last + prelast);
-            result = result % m_capacity;
+            result %= capacity;
             temp /= 100;
         }
-        return result;
+        return result % capacity;
     }
+
     size_type secondary_hash(std::pair<std::string, AutoDocs>* const arr, 
                              size_type i, 
                              size_type capacity,
@@ -214,9 +248,9 @@ private:
         }
         return i;
     }
-
+    
     void expand() {
-        size_type new_capacity = m_capacity * 2;
+        size_type new_capacity = capacity_ * 2;
         if (new_capacity > this->max_size()) 
             throw std::bad_array_new_length();
         rehash(new_capacity);
@@ -229,7 +263,7 @@ private:
     }
 
     void shrink() {
-        size_type new_capacity = std::max(static_cast<size_type>(8), m_capacity / 2);
+        size_type new_capacity = std::max(static_cast<size_type>(8), capacity_ / 2);
         rehash(new_capacity);
     }
 
@@ -239,9 +273,9 @@ private:
         int* new_primary_hash_values = new int[new_capacity]();
         int* new_lines = new int[new_capacity]();
 
-        for (size_type i = 0; i < m_capacity; ++i) {
-            if (m_status[i]) {
-                size_type index = primary_hash(m_buckets[i].first, new_capacity);
+        for (size_type i = 0; i < capacity_; ++i) {
+            if (status_[i]) {
+                size_type index = primary_hash(buckets_[i].first, new_capacity);
                 size_type temp = index;
                 if (new_buckets[index].first != "") {
                     index = secondary_hash(new_buckets, index, new_capacity);
@@ -254,7 +288,7 @@ private:
                         /* if after a try to rehash we have no places to insert, we try again, but with the different size.
                            a bit larger new cap if rehash is called from expand();
                            a bit smaller one if rehash is called from shrink(). */
-                        if (new_capacity < m_capacity) 
+                        if (new_capacity < capacity_) 
                             rehash(new_capacity + new_capacity / 2);
                         else 
                             rehash(new_capacity * 1.25);
@@ -262,29 +296,29 @@ private:
                         return;
                     }
                 }
-                new_buckets[index] = m_buckets[i];
+                new_buckets[index] = buckets_[i];
                 new_status[index] = true;
                 // primary hash value must be connected to insertion position of new key
                 new_primary_hash_values[index] = temp;
-                new_lines[index] = m_lines[i];
+                new_lines[index] = lines_[i];
             }
         }
-        delete[] m_buckets;
-        delete[] m_status;
-        delete[] m_lines;
-        delete[] m_primary_hash_values;
+        delete[] buckets_;
+        delete[] status_;
+        delete[] lines_;
+        delete[] phashes_;
 
-        m_buckets = new_buckets;
-        m_status = new_status;
-        m_lines = new_lines;
-        m_primary_hash_values = new_primary_hash_values;
-        m_capacity = new_capacity;
+        buckets_ = new_buckets;
+        status_ = new_status;
+        lines_ = new_lines;
+        phashes_ = new_primary_hash_values;
+        capacity_ = new_capacity;
     }
 
     unsigned steps(unsigned start, unsigned finish) const {
         int res = 0;
         if (finish < start) {
-            res = (m_capacity - start + finish) / 2;
+            res = (capacity_ - start + finish) / 2;
         } else {
             res = (finish - start) / 2;
         }
@@ -292,14 +326,14 @@ private:
     }
 
 private:
-    std::pair<std::string, AutoDocs>* m_buckets;
-    bool* m_status;
-    int* m_lines;
-    int* m_primary_hash_values;
-    size_type m_capacity;
-    size_type m_size;
-    const float m_threshold_upper;
-    const float m_threshold_lower;
+    std::pair<std::string, AutoDocs>* buckets_;
+    bool* status_;
+    int* lines_;
+    int* phashes_;
+    size_type capacity_;
+    size_type size_;
+    const float threshold_upper_;
+    const float threshold_lower_;
 };
 
 #endif // HASHTABLE_HPP

@@ -32,6 +32,7 @@ class dwgraph final : public graph {
   virtual void add_edge(unsigned, unsigned, unsigned);
   virtual void erase_node(unsigned);
   virtual void erase_edge(unsigned, unsigned);
+  bool has_cycles() const; // dfs spec wrapper 
   dijkstra_result dijkstra_traverse(unsigned, unsigned) const;
   std::vector<unsigned> topologic_sort() const;
 
@@ -39,6 +40,7 @@ class dwgraph final : public graph {
 
  private:
   void topologic_sort_util(unsigned v, std::vector<bool>& visited, std::vector<unsigned>& result) const;
+  bool dfs(unsigned, unsigned, std::vector<bool>&) const; // dfs spec to detect cycles
   std::vector<std::vector<unsigned>> adj_;
 };
 

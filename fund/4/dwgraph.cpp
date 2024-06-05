@@ -5,6 +5,8 @@
 #include <exception>
 #include <climits>
 #include <iostream>
+#include <unordered_map>
+#include <utility>
 #include "dwgraph.hpp"
 
 graph::graph(unsigned N) :
@@ -117,6 +119,29 @@ void dwgraph::erase_edge(unsigned from, unsigned to) {
   adj_[from - 1][to - 1] = 0;
 }
 
+bool dwgraph::dfs(unsigned node, unsigned parent, std::vector<bool>& visited) const {
+  visited[node] = true;
+  for (unsigned neighbor : adj_[node]) {
+    if (!visited[neighbor]) {
+      if (dfs(neighbor, node, visited))
+        return true;
+    } else if (neighbor != parent) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool dwgraph::has_cycles() const {
+  unsigned n = adj_.size();
+  std::vector<bool> visited(n, false);
+  for (unsigned i = 0; i < n; ++i) {
+    if (!visited[i] && dfs(i, -1, visited))
+      return true;
+  }
+  return false;
+}
+
 void dwgraph::topologic_sort_util(unsigned v, std::vector<bool>& visited, std::vector<unsigned>& result) const {
   visited[v] = true;
   for (unsigned i = 0; i < adj_[v].size(); ++i) {
@@ -127,6 +152,9 @@ void dwgraph::topologic_sort_util(unsigned v, std::vector<bool>& visited, std::v
 }
 
 std::vector<unsigned> dwgraph::topologic_sort() const {
+  if (has_cycles())
+    return {}; 
+
   unsigned n = adj_.size();
   std::vector<bool> visited(n, false);
   std::vector<unsigned> result;

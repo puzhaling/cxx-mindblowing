@@ -9,14 +9,15 @@
 #include <utility>
 #include "dwgraph.hpp"
 
-graph::graph(unsigned N) :
-  nodes_(N) 
-{
+graph::graph(unsigned N) 
+    : nodes_(N) {
   std::iota(nodes_.begin(), nodes_.end(), 1);
 }
 
-dwgraph::dwgraph(unsigned N) :
-  graph(N), adj_(N, std::vector<unsigned>(N, 0)) { } 
+dwgraph::dwgraph(unsigned N) 
+    : graph(N), 
+      adj_(N, std::vector<unsigned>(N, 0)) 
+{} 
 
 void dwgraph::add_node() {
   unsigned n = adj_.size();
@@ -119,24 +120,32 @@ void dwgraph::erase_edge(unsigned from, unsigned to) {
   adj_[from - 1][to - 1] = 0;
 }
 
-bool dwgraph::dfs(unsigned node, unsigned parent, std::vector<bool>& visited) const {
-  visited[node] = true;
-  for (unsigned neighbor : adj_[node]) {
-    if (!visited[neighbor]) {
-      if (dfs(neighbor, node, visited))
-        return true;
-    } else if (neighbor != parent) {
-      return true;
+bool dwgraph::dfs(unsigned node, std::vector<bool>& visited, std::vector<bool>& rec_stack) const {
+  if (!visited[node]) {
+    // mark the current node as visited and part of the recursion stack
+    visited[node] = true;
+    rec_stack[node] = true;
+
+    // iterate over all the vertices adjacent to this vertex
+    for (unsigned neighbor = 0; neighbor < adj_[node].size(); ++neighbor) {
+      if (adj_[node][neighbor] != 0) { // There's an edge from node to neighbor
+        if (!visited[neighbor] && dfs(neighbor, visited, rec_stack))
+          return true;
+        else if (rec_stack[neighbor])
+          return true;
+      }
     }
   }
+  rec_stack[node] = false; // remove the vertex from recursion stack
   return false;
 }
 
 bool dwgraph::has_cycles() const {
   unsigned n = adj_.size();
   std::vector<bool> visited(n, false);
+  std::vector<bool> rec_stack(n, false); // to keep track of vertices in the current DFS path
   for (unsigned i = 0; i < n; ++i) {
-    if (!visited[i] && dfs(i, -1, visited))
+    if (dfs(i, visited, rec_stack))
       return true;
   }
   return false;
@@ -152,8 +161,10 @@ void dwgraph::topologic_sort_util(unsigned v, std::vector<bool>& visited, std::v
 }
 
 std::vector<unsigned> dwgraph::topologic_sort() const {
-  if (has_cycles())
-    return {}; 
+  if (has_cycles()) {
+    std::cout << "cycle detected: topologic sort is cancelled";
+    return {};
+  } 
 
   unsigned n = adj_.size();
   std::vector<bool> visited(n, false);

@@ -1,7 +1,7 @@
-#include <filesystem>
+#include <iostream>
 #include <string>
 #include <algorithm>
-#include <iostream>
+#include <fstream>
 
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
@@ -9,45 +9,46 @@
 #include <FL/Fl_Input.H>
 
 #include "start_window.h"
+#include "main_window.h"
+#include "utils.h"
 
-constexpr int kWindowWidth = 1024;
-constexpr int kWindowHeight = 768;
+StartWindow::StartWindow(int w, int h, const char* title)
+    : Fl_Window(w, h, title),
+      read_(new Fl_Input(w/2, h/2, 150, 40, "Считать из файла:")),
+      write_(new Fl_Input(w/2, h/2 + 60, 150, 40, "Записать в файл:")),
+      save_(new Fl_Button(w/2, h/2 + 115, 90, 40, "Сохранить")) {
+  begin();
+    read_->labelsize(15);
+    read_->textsize(15);
+    write_->labelsize(15);
+    write_->textsize(15);
 
-StartWindow::StartWindow()
-    : win_(kWindowWidth, kWindowHeight, "Handbook") { 
-  win_.begin();
-    read_ = new Fl_Input(kWindowWidth/2, kWindowHeight/2, 150, 20, "Read from file:");
-    write_ = new Fl_Input(kWindowWidth/2, kWindowHeight/2 + 30, 150, 20, "Write to file:");
-    htable_size_ = new Fl_Input(kWindowWidth/2, kWindowHeight/2 + 60, 150, 20, "HashTable init. size:");
-    save_ = new Fl_Button(kWindowWidth/2, kWindowHeight/2 + 85, 70, 20, "Save");
-  win_.end();
-
-  inputs_ = {read_, write_, htable_size_};
-  save_->callback(SaveUserInputs, &inputs_);
+    save_->callback(SaveUserInputCb, this);
+  end();
 }
 
-int StartWindow::htable_size() const {
-  return std::stoi(htable_size_->value());
-}
-
-void SaveUserInputs(Fl_Widget* w, void* iw) {
-  namespace fs = std::filesystem;
-
-  UserInputs* inputs = static_cast<UserInputs*>(iw);
-  fs::path read_path(inputs->read_from->value()); 
-  fs::path write_path(inputs->write_to->value());
-
-  inputs->read_from->value("");
-  inputs->write_to->value("");
-  inputs->ht_size->value(""); 
-  
-  if (read_path.empty() || write_path.empty())
+void StartWindow::HandleSave() {
+  if (!InputIsValid() || !PathIsValid(read_->value()) || 
+      !PathIsValid(write_->value())) {
+    std::cerr << "Error: invalid path" << std::endl;
+    read_->value("");
+    write_->value("");
     return;
+  }
+  std::cout << "HandleSave: success" << std::endl;
 
-  constexpr const char* kDefaultHashTableSize = "8";
-  if (inputs->ht_size->value() == "")
-    inputs->ht_size->value(kDefaultHashTableSize);
-  
-  Fl_Window* widget_owner_window = inputs->read_from->window();
-  widget_owner_window->hide();
+  const char* read_path = read_->value();
+  const char* write_path  = write_->value();
+  std::cout << "filepath to read from: " << read_path << '\n';
+  std::cout << "filepath to write to: " << write_path << '\n';
+
+  MainWindow* main_window = new MainWindow(w(), h(), label(), read_path, write_path); 
+  main_window->show();
+  hide();
+  Fl::delete_widget(this);
+}
+
+void StartWindow::SaveUserInputCb(Fl_Widget* w, void* data) {
+  StartWindow* start_window = static_cast<StartWindow*>(data);
+  start_window->HandleSave();
 } 

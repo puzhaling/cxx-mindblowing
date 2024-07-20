@@ -1,51 +1,61 @@
 #ifndef HANDBOOK_HASHTABLE_H_
 #define HANDBOOK_HASHTABLE_H_
 
-#include <iostream>
+#include <iostream>      // for std::cout
 #include <string>
-#include <utility>
-#include "autodocs.h"
+#include <vector>
+#include <unordered_map> // for std::unordered_map
+#include <utility>       // for std::pair
+
+// composite key
+#include "core/passport.h"
+#include "core/date.h"
+
+// value storage
+#include "rbtree.h"
 
 class HashTable {
  public:
-  HashTable(); 
-  explicit HashTable(std::size_t); 
-  ~HashTable(); 
+  struct Key {
+    const Passport passport;
+    const Date date; 
+  };
 
-  void Insert(const std::string&, const AutoDocs&, int); 
-  void Erase(const std::string&, const AutoDocs&); 
-  std::pair<std::size_t, unsigned> Find(const std::string&) const; 
-  std::size_t MaxSize() const; 
-  std::size_t Size() const; 
-  std::size_t Capacity() const; 
-  int operator[] (std::size_t) const; 
+ public:
+  HashTable();
 
-  friend std::ostream& operator<<(std::ostream&, const HashTable&);
+  // returns -1 if insert is not
+  // taking place and 0 otherwise
+  int Insert(const Passport&, const CarSpec&, const FullName&, 
+             const Date&, int line_number); 
+
+  // returns -1 if the searched node 
+  // is not found, 0 if found and deleted
+  int Erase(const Passport&, const CarSpec&, const FullName&,
+            const Date&); 
+
+  // populate last vector with with pairs of copies of
+  // RBTreeNodes and number of steps to find them
+  void FindAll(const Passport&, const CarSpec&, const Date&,
+               std::vector<std::pair<RBTreeNode, int>>&) const; 
+
+  std::vector<RBTreeNode> GetAllNodes() const;
+  void PopulateFrom(const std::string& path);
+  void PopulateWith(const std::vector<RBTreeNode>&);
+  const std::pair<Key, RBTree>* Data() const { return buckets_; }
+
+  static int Size();
+
+//  friend std::ostream& operator<<(std::ostream&, const HashTable&);
 
  private:
-  std::size_t GetPreviousIndex(std::size_t); 
-  float GetLoadFactor() const; 
-  std::size_t GetPrimaryHash(const std::string&, std::size_t) const;
-  
-  std::size_t GetSecondaryHash(std::pair<std::string, AutoDocs>* const, 
-                               std::size_t, 
-                               std::size_t, 
-                               std::string = "") const;
+  static int size_;
 
-  unsigned GetStepsFromTo(unsigned, unsigned) const;
-  void Expand(); 
-  void Expand(std::size_t);
-  void Shrink();
-  void Rehash(std::size_t);
+  int GetPrimaryHash(const Key&) const;
 
-  std::pair<std::string, AutoDocs>* buckets_;
+  std::unordered_map<Passport, FullName> passport_to_fullname_;
+  std::pair<Key, RBTree>* buckets_;
   bool* status_;
-  int* lines_;
-  int* primary_hash_values_;
-  std::size_t capacity_;
-  std::size_t size_;
-  const float threshold_upper_;
-  const float threshold_lower_;
 };
 
 #endif // HANDBOOK_HASHTABLE_H_

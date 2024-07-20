@@ -1,309 +1,193 @@
-#include <utility>
-#include <iostream>
-#include <string>
-#include <limits>
+#include <algorithm> 
+#include <fstream>
+#include <sstream> // for std::istringstream
+
 #include "hashtable.h"
+#include "rbtree.h" 
+#include "utils.h"
 
-HashTable::HashTable() 
-    : capacity_(8), 
-      size_(0), 
-      threshold_upper_(0.8f), 
-      threshold_lower_(0.2f) {
-  buckets_ = new std::pair<std::string, AutoDocs>[capacity_]();
-  status_ = new bool[capacity_]();
-  lines_ = new int[capacity_]();
-  primary_hash_values_ = new int[capacity_]();
+HashTable::HashTable()
+    : passport_to_fullname_() {
+  buckets_ = new std::pair<Key, RBTree>[HashTable::Size()];
+  status_ = new bool[HashTable::Size()];
 }
 
-HashTable::HashTable(std::size_t N) 
-    : capacity_(N), 
-      size_(0), 
-      threshold_upper_(0.8f), 
-      threshold_lower_(0.2f) {
-  buckets_ = new std::pair<std::string, AutoDocs>[capacity_]();
-  status_ = new bool[capacity_]();
-  lines_ = new int[capacity_]();
-  primary_hash_values_ = new int[capacity_]();
-}
+int HashTable::Insert(const Passport& passport, const CarSpec& carspec, 
+                      const FullName& fullname, const Date& date, 
+                      int line_number) { 
+  Key key = {passport, date};
+  int index = GetPrimaryHash(key);
 
-HashTable::~HashTable() {
-  delete[] buckets_;
-  delete[] status_;
-  delete[] lines_;
-  delete[] primary_hash_values_;
-}
-
-void HashTable::Insert(const std::string& key, const AutoDocs& value, int line) {
-  if (Find(key).first != -1) {
-    std::cout << "duplicate key. insertion is cancelled\n";
-    return;
-  }
-  if (GetLoadFactor() >= threshold_upper_)
-    Expand();
-
-  std::size_t index = GetPrimaryHash(key, capacity_);
-  std::size_t temp = index;
-   
-  if (status_[index]) {
-    index = GetSecondaryHash(buckets_, index, capacity_);
-    if (index == -1) {
-      Expand(capacity_ * 1.5);
-      Insert(key, value, line);
-      return;
+  auto iter = passport_to_fullname_.find(passport);
+  if (iter != passport_to_fullname_.end()) {
+    const auto& exist_fullname = iter->second;
+    if (exist_fullname != fullname) {
+      std::cerr << "HashTable::Insert: two diff people with the same passport\n";
+      return -1; 
     }
-  }
-
-  buckets_[index] = std::make_pair(key, value);
-  status_[index] = true;
-
-  // primary hash value must be connected to final insertion position of a new key
-  primary_hash_values_[index] = temp;
-  lines_[index] = line;
-  size_++;
+  } else {
+    passport_to_fullname_[passport] = fullname; 
+    std::cout << "HashTable::Insert: new passport was added\n";
+  }  
+  RBTree& tree = buckets_[index].second;
+  int res = tree.Insert(passport, carspec, fullname, date, line_number);
+  if (res == 0)
+    status_[index] = true;
+  return res;
 }
     
-std::size_t HashTable::GetPreviousIndex(std::size_t index) {
-  switch (index) {
-  case 0: return capacity_ - 2; break;
-  case 1: return capacity_ - 1; break;
-  default: return index - 2; break;
-  }
-}
- 
 
-void HashTable::Erase(const std::string& key, const AutoDocs& value) {
-  using std::swap;
-  std::size_t index = Find(key).first;
-  if (index == -1)
+int HashTable::Erase(const Passport& passport, const CarSpec& carspec, 
+                     const FullName& fullname, const Date& date) {
+  Key key = {passport, date};
+  int index = GetPrimaryHash(key);
+  if (!status_[index])
+    return -1;
+
+  RBTree& tree = buckets_[index].second; 
+  return tree.DeleteRBTreeNode(passport, carspec, fullname, date);
+}
+
+// returns a pair that includes 
+// index of found element as first
+// and steps to find it as second
+void HashTable::FindAll(
+    const Passport& passport,
+    const CarSpec& carspec,
+    const Date& date,
+    std::vector<std::pair<RBTreeNode, int>>& collection) const {
+  Key key = {passport, date};
+  int index = GetPrimaryHash(key);
+  if (!status_[index])
     return;
-  if (buckets_[index].second != value) 
-    return;
 
-  buckets_[index].first = "";
-  status_[index] = false;
-  lines_[index] = 0;
-  primary_hash_values_[index] = -1;
-  size_--;
-
-  std::size_t target_hash = GetPrimaryHash(key, capacity_);
-  
-  std::size_t prev_prev_hash = GetPrimaryHash(buckets_[GetPreviousIndex(index)].first, capacity_);
-  std::size_t next_next_hash = GetPrimaryHash(buckets_[GetPreviousIndex(index)].first, capacity_);
-  if (prev_prev_hash == next_next_hash) {
-    if (GetLoadFactor() <= threshold_lower_)
-      Shrink();
-    else 
-      Rehash(capacity_);
-    return;
-  }
-
-  index = (index + 2) % capacity_;
-  while (status_[index] && GetPrimaryHash(buckets_[index].first, capacity_) == target_hash) {
-    swap(buckets_[GetPreviousIndex(index)], buckets_[index]);
-    swap(lines_[GetPreviousIndex(index)], lines_[index]);
-    swap(status_[GetPreviousIndex(index)], status_[index]);
-    swap(primary_hash_values_[GetPreviousIndex(index)], primary_hash_values_[index]);
-    index = (index + 2) % capacity_;
-  } 
-
-  // since 'index' stops on non empty bucket, 
-  // we need to get GetPreviousIndex(index) value to get the right pos
-  std::size_t empty_index = GetPreviousIndex(index);
-  std::size_t current_index = empty_index;
-  target_hash = empty_index;
-
-  for (std::size_t i = 0; i < capacity_; ++i) {
-    if (status_[i] && primary_hash_values_[i] == target_hash && i != current_index) {
-      while (status_[current_index])
-        current_index = (current_index + 2) % capacity_;
-      
-      swap(buckets_[i], buckets_[current_index]);
-      swap(lines_[i], lines_[current_index]);
-      swap(status_[i], status_[current_index]);
-      swap(primary_hash_values_[i], primary_hash_values_[current_index]);
-    }            
-  }
-
-  if (GetLoadFactor() <= threshold_lower_)
-    Shrink();
+  RBTree& tree = buckets_[index].second;
+  tree.SearchAll(passport, carspec, date, collection); 
+  return;
 }
 
-//        index,     steps 
-std::pair<std::size_t, unsigned> HashTable::Find(const std::string& key) const {
-  std::size_t index = GetPrimaryHash(key, capacity_);
-  if (buckets_[index].first == "")
-    return std::make_pair(-1, 1);
-  else if (buckets_[index].first == key)
-    return std::make_pair(index, 1);
+int HashTable::GetPrimaryHash(const Key& key) const {
+  int result = 0;
+  int passport_sum = 0;
+  int date_sum = 0;
 
-  int start = index;
-  index = GetSecondaryHash(buckets_, index, capacity_, key);
-  int finish = index;
+  const Passport& passport = key.passport;
+  for (char ch : passport.series)
+    passport_sum += ch;
+  for (char ch : passport.number)
+    passport_sum += ch;
 
-  if (index == -1)
-    return std::make_pair(-1, capacity_);
-  else
-    return std::make_pair(index, GetStepsFromTo(start, finish));
-}
+  const Date& date = key.date;
+  for (char ch : date.day)
+    date_sum += ch;
+  for (char ch : date.month)
+    date_sum += ch;
+  for (char ch : date.year)
+    date_sum += ch;
 
-std::size_t HashTable::MaxSize() const {
-  return std::numeric_limits<std::size_t>::max() / sizeof(AutoDocs);
-}
-
-std::size_t HashTable::Size() const {
-  return size_;
-}
-
-std::size_t HashTable::Capacity() const {
-  return capacity_;
-}
-
-int HashTable::operator[] (std::size_t index) const {
-  return lines_[index];
-}
-
-std::ostream& operator<<(std::ostream& out, const HashTable& table) {
-  for (std::size_t i = 0; i < table.capacity_; ++i) {
-    if (table.status_[i]) {
-      std::size_t len = table.buckets_[i].first.length();
-      out << table.buckets_[i].first;
-
-      while (len++ != 30) 
-          out << ' ';
-
-      out << '\t';
-      out << '{' << table.buckets_[i].second << '}' << '\t';
-      out << "\thash value: {" << table.primary_hash_values_[i] << "}";
-      out << " index: " << i << '\n';
-    }
-  }
-  return out;
-} 
-
-float HashTable::GetLoadFactor() const {
-  return static_cast<float>(size_) / capacity_;
-}
-
-std::size_t HashTable::GetPrimaryHash(const std::string& key, 
-                                      std::size_t capacity) const {
-  std::size_t result = 0;
-  std::size_t fullname_sum = 0;
-  std::size_t request_sum = 0;
-
-  std::size_t i;
-  std::size_t len = key.length();
-  for (i = 0; i < len; ++i) {
-    if (std::isspace(key[i])) 
-        continue;
-    if (std::isdigit(key[i])) 
-        break;
-    fullname_sum += key[i];
-  }
-
-  for (;i < len; ++i) 
-    request_sum = request_sum * 10 + (key[i] - '0');
-  
-  std::size_t temp = request_sum + fullname_sum;
-  
-  int last, prelast; 
+  int temp = passport_sum + date_sum;
+  int last, prelast;
   while (temp > 0) {
     last = temp % 10;
     prelast = (temp % 100) / 10;
-    result = result + (last + prelast);
-    result %= capacity;
-    temp /= 100;
+    result += (last + prelast);
+    result %= HashTable::Size();
+    temp /= 100;  
   }
-  return result % capacity;
+  return result;
 }
 
-std::size_t HashTable::GetSecondaryHash(
-    std::pair<std::string, AutoDocs>* const arr, 
-    std::size_t i, 
-    std::size_t capacity,
-    std::string stopper) const {
-  std::size_t steps = 0;
-  while (arr[i].first != stopper) {
-    if (steps > capacity)
-      return -1;
-    i = (i + 2) % capacity;
-    steps++;
-  }
-  return i;
-}
-
-void HashTable::Expand() {
-  std::size_t new_capacity = capacity_ * 2;
-  if (new_capacity > this->MaxSize()) 
-    throw std::bad_array_new_length();
-  Rehash(new_capacity);
-}
-
-void HashTable::Expand(std::size_t capacity) {
-  if (capacity > this->MaxSize()) 
-    throw std::bad_array_new_length();
-  Rehash(capacity);
-}
-
-void HashTable::Shrink() {
-  std::size_t new_capacity = std::max(static_cast<std::size_t>(8), capacity_ / 2);
-  Rehash(new_capacity);
-}
-
-void HashTable::Rehash(std::size_t new_capacity) {
-  std::pair<std::string, AutoDocs>* new_buckets = new std::pair<std::string, AutoDocs>[new_capacity]();
-  bool* new_status = new bool[new_capacity]();
-  int* new_GetPrimaryHash_values = new int[new_capacity]();
-  int* new_lines = new int[new_capacity]();
-
-  for (std::size_t i = 0; i < capacity_; ++i) {
+std::vector<RBTreeNode> HashTable::GetAllNodes() const {
+  std::vector<RBTreeNode> all_nodes;
+  for (int i = 0; i < HashTable::Size(); ++i) {
     if (status_[i]) {
-      std::size_t index = GetPrimaryHash(buckets_[i].first, new_capacity);
-      std::size_t temp = index;
-      if (new_buckets[index].first != "") {
-        index = GetSecondaryHash(new_buckets, index, new_capacity);
-        if (index == -1) {
-          delete[] new_buckets;
-          delete[] new_status;
-          delete[] new_GetPrimaryHash_values;
-          delete[] new_lines;
-
-          /* if after a try to Rehash we have no places to insert, we try again, but with the different size.
-             a bit larger new cap if Rehash is called from Expand();
-             a bit smaller one if Rehash is called from shrink(). */
-          if (new_capacity < capacity_) 
-            Rehash(new_capacity + new_capacity / 2);
-          else 
-            Rehash(new_capacity * 1.25);
-
-          return;
-        }
-      }
-      new_buckets[index] = buckets_[i];
-      new_status[index] = true;
-      // primary hash value must be connected to insertion position of new key
-      new_GetPrimaryHash_values[index] = temp;
-      new_lines[index] = lines_[i];
+      std::vector<RBTreeNode> nodes = buckets_[i].second.GetAllRBTreeNodes();
+      for (const auto& node : nodes)
+        all_nodes.emplace_back(node);
     }
   }
-  delete[] buckets_;
-  delete[] status_;
-  delete[] lines_;
-  delete[] primary_hash_values_;
-
-  buckets_ = new_buckets;
-  status_ = new_status;
-  lines_ = new_lines;
-  primary_hash_values_ = new_GetPrimaryHash_values;
-  capacity_ = new_capacity;
+  return all_nodes;
 }
 
-unsigned HashTable::GetStepsFromTo(unsigned start, unsigned finish) const {
-  int res = 0;
-  if (finish < start) {
-    res = (capacity_ - start + finish) / 2;
-  } else {
-    res = (finish - start) / 2;
+void HashTable::PopulateFrom(const std::string& path) {
+  if (!PathIsValid(path))
+    return;
+  
+  std::ifstream input_stream(path.c_str());
+  std::string line;
+  int line_number = 1;
+  while (std::getline(input_stream, line)) {
+    std::istringstream line_buffer(line);
+    
+    Passport passport;
+    CarSpec carspec;
+    FullName fullname;
+    Date date;
+
+    std::string word;
+    int counter = 1;
+    bool invalid_number_of_words = false;
+    while (line_buffer >> word) {
+      switch (counter) {
+      case 1:
+        passport.series = word;
+        break;
+      case 2:
+        passport.number = word;
+        break;
+      case 3:
+        carspec.make = word;
+        break;
+      case 4:
+        carspec.model = word;
+        break;
+      case 5:
+        fullname.surname = word;
+        break;
+      case 6:
+        fullname.name = word;
+        break;
+      case 7:
+        fullname.patronymic = word;
+        break;
+      case 8:
+        date.day = word;
+        break;
+      case 9:
+        date.month = word;
+        break;
+      case 10:
+        date.year = word;
+        break; 
+      default:
+        invalid_number_of_words = true;
+        break;
+      }
+      counter++; 
+    }
+    if (invalid_number_of_words) {
+      std::cout << "Error: invalid number of words at line: " << line_number << std::endl;
+    } else {
+      if (!IsValid(passport) || !IsValid(carspec) || !IsValid(fullname) ||
+          !IsValid(date)) {
+            std::cout << "Error: invalid line format at line: " << line_number << std::endl; 
+      } else {
+        this->Insert(passport, carspec, fullname, date, line_number);
+      } 
+    }
+    line_number++;
   }
-  return res;
+  input_stream.close();
 }
 
+void HashTable::PopulateWith(const std::vector<RBTreeNode>& nodes) {
+  for (const auto& node : nodes) 
+    this->Insert(node.passport, node.carspec, node.fullname, 
+                 node.date, node.line_number);
+}
+
+int HashTable::size_ = 5;
+
+int HashTable::Size() {
+  return size_;
+}

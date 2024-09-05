@@ -10,7 +10,7 @@ int main() {
     ;
   };
 
-  auto eq_two_types_predicate_ = [] <typename T> (T&& first, 
+  auto  eq_two_types_predicate_ = [] <typename T> (T&& first, 
         T&& second) {
     ;
   };

@@ -4,3 +4,6 @@
 
 # no hidden files
 .*
+
+#ignore testing file
+TEST.*

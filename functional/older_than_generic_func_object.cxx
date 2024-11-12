@@ -1,3 +1,4 @@
+// full class as a template class is redudant
 template <typename T>
 class older_than {
  public:
@@ -22,9 +23,12 @@ class older_than {
   {
   }
 
+	// auto deducing type of item working on
   template <typename T>
   bool operator()(T&& object) const
   { 
+		// use perfect forwarding here to use overloaded
+		// versions of method age() for lvalue and rvalue objects
     return std::forward<T>(object).age() > limit_;
   }
  

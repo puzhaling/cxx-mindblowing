@@ -1,4 +1,3 @@
-#include <any>
 #include <assert>
 #include <memory>
 
@@ -11,16 +10,26 @@ class init_t {
 
 class running_t {
 public:
+  running_t(const std::string& url)
+    : m_web_page(url)
+  {
+  }
+
+  void count_words(const std::string& web_page)
+  {
+    m_count = std::distance(
+            std::istream_iterator<std::string>(m_web_page),
+            std::istream_iterator<std::string>());
+  }
+
   unsigned count() const
   {
     return m_count;
   }
 
-  // ...
-
 private:
   unsigned m_count = 0;
-  socket_t m_web_page;
+  std::istream m_web_page;
 };
 
 class finished_t {
@@ -45,7 +54,7 @@ public:
 
   void counting_finished()
   {
-    auto* state = std::get_if<running_t>(&m_state);
+    const auto* state = std::get_if<running_t>(&m_state);
 
     assert(state != nullptr);
 

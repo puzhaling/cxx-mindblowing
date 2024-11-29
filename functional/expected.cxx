@@ -53,6 +53,20 @@ public:
     }
   }
 
+  operator bool() const
+  {
+    return m_valid;
+  }
+
+  operator std::optional<T>() const
+  {
+    if (m_valid) {
+      return m_value;
+    } else {
+      return std::optional<T>();
+    }
+  }
+  
   T& get()
   {
     if (!m_valid) {
@@ -116,4 +130,17 @@ expected<int, std::string> divide(int numerator, int denominator) {
         return expected<int, std::string>::error("Division by zero");
     }
     return expected<int, std::string>::success(numerator / denominator);
-} 
+}
+
+template <typename T, template Variant,
+	  template Expected = expected<T, std::string>>
+Expected get_if(const Variant& variant)
+{
+  T *ptr = std::get_if<T>(variant);
+
+  if (ptr) {
+    return Expected::success(*ptr);
+  } else {
+    return Expected::error("Variant doesn't contain the desired type");
+  }
+}
